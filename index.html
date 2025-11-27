@@ -27,14 +27,259 @@
   </style>
 </head>
 <body>
-  <div class="card" role="main">
+  <div class="card" role="main" aria-live="polite">
     <h1 id="title">Sign Up</h1>
 
-    <div class="modeRow" aria-hidden="false">
+    <div class="modeRow" id="modeRow">
       <button id="btnSignup" class="modeBtn active" type="button">Sign Up</button>
       <button id="btnLogin" class="modeBtn" type="button">Login</button>
     </div>
 
+    <label id="labelEmail" for="email">Email</label>
+    <input id="email" type="email" placeholder="you@example.com" autocomplete="email" />
+
+    <label id="labelPassword" for="password">Password</label>
+    <input id="password" type="password" placeholder="password" autocomplete="current-password" />
+
+    <div class="actionWrap">
+      <button id="registerBtn" class="actionBtn" type="button">Register</button>
+      <button id="loginActionBtn" class="actionBtn hidden" type="button">Login</button>
+    </div>
+
+    <div style="display:flex;justify-content:center;margin-top:10px;">
+      <button id="forgotBtn" class="linkBtn hidden" type="button">I forgot my password</button>
+    </div>
+
+    <div class="small">After login you will see coins and high score</div>
+
+    <section id="profile" class="profile" aria-live="polite">
+      <div id="welcome" style="font-weight:700;text-align:center;margin-top:10px"></div>
+      <div class="profileRow">
+        <div><strong>Coins:</strong> <span id="coins">0</span></div>
+        <div><strong>High Score:</strong> <span id="highScore">0</span></div>
+      </div>
+
+      <label style="margin-top:12px">Submit Score</label>
+      <input id="scoreInput" type="number" placeholder="Enter score (e.g., 100)" />
+      <label style="margin-top:8px">Coins Earned</label>
+      <input id="coinsInput" type="number" placeholder="Coins earned (e.g., 5)" />
+
+      <div class="actionWrap" style="margin-top:10px">
+        <button id="submitScoreBtn" class="actionBtn" type="button">Submit Score</button>
+      </div>
+      <div class="actionWrap" style="margin-top:8px">
+        <button id="logoutBtn" class="actionBtn btnDanger" type="button">Logout</button>
+      </div>
+    </section>
+
+    <div id="msg" class="msg" role="status" aria-live="polite"></div>
+  </div>
+
+  <script type="module">
+    // Firebase v9 modular imports
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+    import { getDatabase, ref, set, get, runTransaction } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+
+    // Replace with your config (kept as in original)
+    const firebaseConfig = {
+      apiKey: "AIzaSyD8Vz9WCsGwvs8a3hm0smPFysM0lMnF2uY",
+      authDomain: "data-c6b63.firebaseapp.com",
+      databaseURL: "https://data-c6b63-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "data-c6b63",
+      storageBucket: "data-c6b63.firebasestorage.app",
+      messagingSenderId: "473217478100",
+      appId: "1:473217478100:web:e9508960991a17dfa1fa41",
+      measurementId: "G-8P4JRVVCTR"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+
+    // Elements
+    const btnSignup = document.getElementById('btnSignup');
+    const btnLogin = document.getElementById('btnLogin');
+    const title = document.getElementById('title');
+
+    const emailEl = document.getElementById('email');
+    const passEl = document.getElementById('password');
+
+    const registerBtn = document.getElementById('registerBtn');
+    const loginActionBtn = document.getElementById('loginActionBtn');
+    const forgotBtn = document.getElementById('forgotBtn');
+
+    const msgEl = document.getElementById('msg');
+
+    const profileSection = document.getElementById('profile');
+    const welcome = document.getElementById('welcome');
+    const coinsEl = document.getElementById('coins');
+    const highScoreEl = document.getElementById('highScore');
+    const scoreInput = document.getElementById('scoreInput');
+    const coinsInput = document.getElementById('coinsInput');
+    const submitScoreBtn = document.getElementById('submitScoreBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    // Mode toggle
+    function setMode(mode) {
+      if (mode === 'signup') {
+        btnSignup.classList.add('active');
+        btnLogin.classList.remove('active');
+        title.textContent = 'Sign Up';
+        registerBtn.classList.remove('hidden');
+        loginActionBtn.classList.add('hidden');
+        forgotBtn.classList.add('hidden');
+      } else {
+        btnSignup.classList.remove('active');
+        btnLogin.classList.add('active');
+        title.textContent = 'Login';
+        registerBtn.classList.add('hidden');
+        loginActionBtn.classList.remove('hidden');
+        forgotBtn.classList.remove('hidden');
+      }
+      msgEl.textContent = '';
+      emailEl.focus();
+    }
+
+    btnSignup.addEventListener('click', () => setMode('signup'));
+    btnLogin.addEventListener('click', () => setMode('login'));
+    setMode('signup');
+
+    function showMsg(text, color = '#b00') {
+      msgEl.style.color = color;
+      msgEl.textContent = text;
+      // clear after a short delay
+      setTimeout(() => { if (msgEl.textContent === text) msgEl.textContent = ''; }, 4500);
+    }
+
+    // Register
+    registerBtn.addEventListener('click', async () => {
+      const email = emailEl.value.trim();
+      const password = passEl.value;
+      if (!email || !password) return showMsg('Enter email and password');
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        const uid = cred.user.uid;
+        await set(ref(db, 'users/' + uid), { email, coins: 0, high_score: 0, createdAt: Date.now() });
+        showMsg('Registered and logged in', '#080');
+      } catch (err) {
+        // show friendly message; avoid dumping raw error text to the page
+        showMsg(err && err.code ? err.code.replace('auth/','') : 'Register failed');
+      }
+    });
+
+    // Login
+    loginActionBtn.addEventListener('click', async () => {
+      const email = emailEl.value.trim();
+      const password = passEl.value;
+      if (!email || !password) return showMsg('Enter email and password');
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        showMsg('Logged in', '#080');
+      } catch (err) {
+        showMsg(err && err.code ? err.code.replace('auth/','') : 'Login failed');
+      }
+    });
+
+    // Forgot password
+    forgotBtn.addEventListener('click', async () => {
+      const email = emailEl.value.trim();
+      if (!email) return showMsg('Enter your email to reset password');
+      try {
+        await sendPasswordResetEmail(auth, email);
+        showMsg('If an account exists, a reset email has been sent', '#080');
+      } catch (err) {
+        // keep message generic for privacy and simplicity
+        showMsg('If an account exists, a reset email has been sent', '#080');
+      }
+    });
+
+    // Logout
+    logoutBtn.addEventListener('click', async () => {
+      try {
+        await signOut(auth);
+        showMsg('Logged out', '#333');
+      } catch {
+        showMsg('Logout failed');
+      }
+    });
+
+    // Submit score (atomic)
+    submitScoreBtn.addEventListener('click', async () => {
+      const score = parseInt(scoreInput.value || '0', 10);
+      const coinsEarned = parseInt(coinsInput.value || '0', 10);
+      const user = auth.currentUser;
+      if (!user) return showMsg('Not logged in');
+      if (isNaN(score) || isNaN(coinsEarned)) return showMsg('Enter valid numbers');
+      const userRef = ref(db, 'users/' + user.uid);
+      try {
+        await runTransaction(userRef, (current) => {
+          if (current === null) return current;
+          const newCoins = (current.coins || 0) + coinsEarned;
+          const newHigh = Math.max(current.high_score || 0, score);
+          return { ...current, coins: newCoins, high_score: newHigh };
+        });
+        await loadProfile(user.uid);
+        showMsg('Score submitted', '#080');
+      } catch {
+        showMsg('Submit failed');
+      }
+    });
+
+    // Load profile
+    async function loadProfile(uid) {
+      try {
+        const snap = await get(ref(db, 'users/' + uid));
+        if (!snap.exists()) return;
+        const data = snap.val();
+        welcome.textContent = 'Logged in as ' + (data.email || uid);
+        coinsEl.textContent = data.coins ?? 0;
+        highScoreEl.textContent = data.high_score ?? 0;
+      } catch {
+        // silent fail for UI simplicity
+      }
+    }
+
+    // Auth state listener
+    onAuthStateChanged(auth, async user => {
+      if (user) {
+        // show profile, hide auth inputs
+        document.getElementById('title').textContent = 'Profile';
+        document.getElementById('modeRow').classList.add('hidden');
+        document.getElementById('labelEmail').classList.add('hidden');
+        document.getElementById('labelPassword').classList.add('hidden');
+        emailEl.classList.add('hidden');
+        passEl.classList.add('hidden');
+        registerBtn.classList.add('hidden');
+        loginActionBtn.classList.add('hidden');
+        forgotBtn.classList.add('hidden');
+        profileSection.style.display = 'block';
+        await loadProfile(user.uid);
+      } else {
+        // show auth inputs
+        document.getElementById('title').textContent = 'Sign Up';
+        document.getElementById('modeRow').classList.remove('hidden');
+        document.getElementById('labelEmail').classList.remove('hidden');
+        document.getElementById('labelPassword').classList.remove('hidden');
+        emailEl.classList.remove('hidden');
+        passEl.classList.remove('hidden');
+        profileSection.style.display = 'none';
+        setMode('signup');
+        emailEl.value = '';
+        passEl.value = '';
+      }
+    });
+
+    // Keyboard shortcuts: Enter to submit
+    function trySubmit() {
+      if (!registerBtn.classList.contains('hidden')) registerBtn.click();
+      else loginActionBtn.click();
+    }
+    emailEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') trySubmit(); });
+    passEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') trySubmit(); });
+  </script>
+</body>
+</html>
     <label for="email">Email</label>
     <input id="email" type="email" placeholder="you@example.com" autocomplete="email" />
 
