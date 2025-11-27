@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Menu - Homen beta 0.0.1</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    body { font-family: system-ui, Arial; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; background:#f4f6f8; }
+    .card { text-align:center; padding:2rem; border-radius:12px; box-shadow:0 6px 18px rgba(0,0,0,.08); background:white; width:320px; }
+    button { padding:0.6rem 1.2rem; font-size:1rem; border-radius:8px; border:none; background:#0b76ff; color:white; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <div class="card" id="menu">
+    <h1>Menu</h1>
+    <p>Welcome to Homen beta 0.0.1</p>
+    <button id="onlineBtn">Online</button>
+  </div>
+
+  <script>
+    document.getElementById('onlineBtn').addEventListener('click', function () {
+      const user = prompt('Login - enter username:');
+      if (user === null) return;
+      const pass = prompt('Login - enter password:');
+      if (pass === null) return;
+      if (user === 'admin' && pass === '1234') {
+        alert('Login successful. Welcome, ' + user + '!');
+      } else {
+        alert('Login failed. Try again.');
+      }
+    });
+  </script>
+</body>
+</html>
