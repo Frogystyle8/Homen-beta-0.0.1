@@ -18,13 +18,14 @@
     .modeRow{display:flex;gap:8px;margin-bottom:12px}
     .modeBtn{flex:1;padding:8px;border-radius:8px;border:1px solid #d6dbe0;background:#fff;color:#0b76ff;font-weight:700;cursor:pointer}
     .modeBtn.active{background:#0b76ff;color:#fff;border-color:#0b76ff}
+    .linkBtn{background:transparent;color:#0b76ff;border:none;padding:6px 0;cursor:pointer;font-weight:600}
   </style>
 </head>
 <body>
   <div class="card">
     <h1>Menu</h1>
 
-    <!-- New: Sign Up / Login buttons before the prompt -->
+    <!-- Sign Up / Login toggle -->
     <div class="modeRow">
       <button id="showSignup" class="modeBtn active">Sign Up</button>
       <button id="showLogin" class="modeBtn">Login</button>
@@ -35,6 +36,201 @@
       <input id="email" type="email" placeholder="you@example.com" />
       <label>Password</label>
       <input id="password" type="password" placeholder="password" />
+      <div class="row" style="margin-top:10px;">
+        <button id="registerBtn" class="half">Register</button>
+        <button id="loginBtn" class="half">Login</button>
+      </div>
+
+      <!-- Forgot password button -->
+      <div style="display:flex;justify-content:center;margin-top:8px;">
+        <button id="forgotBtn" class="linkBtn">I forgot my password</button>
+      </div>
+
+      <div class="small">After login you will see coins and high score</div>
+    </div>
+
+    <div id="profileArea" style="display:none;">
+      <div class="small" id="welcomeText"></div>
+      <div style="margin-top:10px">
+        <div><strong>Coins:</strong> <span id="coins">0</span></div>
+        <div style="margin-top:6px"><strong>High Score:</strong> <span id="highScore">0</span></div>
+      </div>
+
+      <label style="margin-top:12px">Submit Score</label>
+      <input id="scoreInput" type="number" placeholder="Enter score (e.g., 100)" />
+      <label style="margin-top:8px">Coins Earned</label>
+      <input id="coinsInput" type="number" placeholder="Coins earned this round (e.g., 5)" />
+      <button id="submitScoreBtn">Submit Score</button>
+      <button id="logoutBtn" class="danger" style="margin-top:8px">Logout</button>
+    </div>
+
+    <div id="msg" class="small" style="margin-top:10px;color:#b00"></div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+    import { getDatabase, ref, set, get, runTransaction } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+
+    // ======= PASTED FIREBASE CONFIG =======
+    const firebaseConfig = {
+      apiKey: "AIzaSyD8Vz9WCsGwvs8a3hm0smPFysM0lMnF2uY",
+      authDomain: "data-c6b63.firebaseapp.com",
+      databaseURL: "https://data-c6b63-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "data-c6b63",
+      storageBucket: "data-c6b63.firebasestorage.app",
+      messagingSenderId: "473217478100",
+      appId: "1:473217478100:web:e9508960991a17dfa1fa41",
+      measurementId: "G-8P4JRVVCTR"
+    };
+    // =====================================
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+
+    // UI
+    const emailEl = document.getElementById('email');
+    const passEl = document.getElementById('password');
+    const registerBtn = document.getElementById('registerBtn');
+    const loginBtn = document.getElementById('loginBtn');
+    const forgotBtn = document.getElementById('forgotBtn');
+    const msgEl = document.getElementById('msg');
+    const profileArea = document.getElementById('profileArea');
+    const authArea = document.getElementById('authArea');
+    const welcomeText = document.getElementById('welcomeText');
+    const coinsEl = document.getElementById('coins');
+    const highScoreEl = document.getElementById('highScore');
+    const scoreInput = document.getElementById('scoreInput');
+    const coinsInput = document.getElementById('coinsInput');
+    const submitScoreBtn = document.getElementById('submitScoreBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    // Mode buttons
+    const showSignup = document.getElementById('showSignup');
+    const showLogin = document.getElementById('showLogin');
+
+    function setMode(mode) {
+      if (mode === 'signup') {
+        showSignup.classList.add('active');
+        showLogin.classList.remove('active');
+        registerBtn.style.display = 'inline-block';
+        loginBtn.style.display = 'inline-block';
+        emailEl.focus();
+      } else {
+        showSignup.classList.remove('active');
+        showLogin.classList.add('active');
+        registerBtn.style.display = 'inline-block';
+        loginBtn.style.display = 'inline-block';
+        emailEl.focus();
+      }
+    }
+
+    showSignup.addEventListener('click', () => setMode('signup'));
+    showLogin.addEventListener('click', () => setMode('login'));
+    setMode('signup');
+
+    function showMsg(text, color = '#b00') {
+      msgEl.style.color = color;
+      msgEl.textContent = text;
+      setTimeout(()=> { msgEl.textContent = ''; }, 5000);
+    }
+
+    // Register: create auth user and user node in Realtime DB
+    registerBtn.addEventListener('click', async () => {
+      const email = emailEl.value.trim();
+      const password = passEl.value;
+      if (!email || !password) return showMsg('Enter email and password');
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        const uid = cred.user.uid;
+        await set(ref(db, 'users/' + uid), { email, coins: 0, high_score: 0, createdAt: Date.now(), hasPassword: true });
+        showMsg('Registered and logged in', '#080');
+      } catch (err) {
+        showMsg(err.message || 'Register failed');
+      }
+    });
+
+    // Login
+    loginBtn.addEventListener('click', async () => {
+      const email = emailEl.value.trim();
+      const password = passEl.value;
+      if (!email || !password) return showMsg('Enter email and password');
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        showMsg('Logged in', '#080');
+      } catch (err) {
+        showMsg(err.message || 'Login failed');
+      }
+    });
+
+    // Forgot password: send reset email
+    forgotBtn.addEventListener('click', async () => {
+      const email = emailEl.value.trim();
+      if (!email) return showMsg('Enter your email to reset password');
+      try {
+        // Send password reset email. Message is intentionally neutral to avoid revealing account existence.
+        await sendPasswordResetEmail(auth, email);
+        showMsg('If an account exists, a password reset email has been sent', '#080');
+      } catch (err) {
+        // For UX, still show neutral message on common errors like user-not-found
+        showMsg('If an account exists, a password reset email has been sent', '#080');
+      }
+    });
+
+    // Logout
+    logoutBtn.addEventListener('click', async () => {
+      await signOut(auth);
+      showMsg('Logged out', '#333');
+    });
+
+    // Submit score: increment coins and update high score if higher
+    submitScoreBtn.addEventListener('click', async () => {
+      const score = parseInt(scoreInput.value || '0', 10);
+      const coinsEarned = parseInt(coinsInput.value || '0', 10);
+      const user = auth.currentUser;
+      if (!user) return showMsg('Not logged in');
+      if (isNaN(score) || isNaN(coinsEarned)) return showMsg('Enter valid numbers');
+      const userRef = ref(db, 'users/' + user.uid);
+
+      try {
+        await runTransaction(userRef, (current) => {
+          if (current === null) return current;
+          const newCoins = (current.coins || 0) + coinsEarned;
+          const newHigh = Math.max(current.high_score || 0, score);
+          return { ...current, coins: newCoins, high_score: newHigh };
+        });
+        await loadProfile(user.uid);
+        showMsg('Score submitted', '#080');
+      } catch (err) {
+        showMsg(err.message || 'Submit failed');
+      }
+    });
+
+    // Load profile from Realtime DB
+    async function loadProfile(uid) {
+      const snap = await get(ref(db, 'users/' + uid));
+      if (!snap.exists()) return;
+      const data = snap.val();
+      welcomeText.textContent = 'Logged in as ' + (data.email || uid);
+      coinsEl.textContent = data.coins ?? 0;
+      highScoreEl.textContent = data.high_score ?? 0;
+    }
+
+    // Auth state listener
+    onAuthStateChanged(auth, async user => {
+      if (user) {
+        authArea.style.display = 'none';
+        profileArea.style.display = 'block';
+        await loadProfile(user.uid);
+      } else {
+        authArea.style.display = 'block';
+        profileArea.style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>      <input id="password" type="password" placeholder="password" />
       <div class="row" style="margin-top:10px;">
         <button id="registerBtn" class="half">Register</button>
         <button id="loginBtn" class="half">Login</button>
