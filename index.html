@@ -2,39 +2,292 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Homen - Auth + Realtime DB</title>
+  <title>Homen — Login / Sign up</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    :root{--blue:#0b76ff;--danger:#e74c3c;--card-w:380px}
+    :root{--blue:#0b76ff;--danger:#e74c3c;--card-w:420px}
     html,body{height:100%;margin:0}
     body{font-family:system-ui,Arial,Helvetica,sans-serif;display:flex;align-items:center;justify-content:center;background:#f3f6fb;padding:20px}
-    .card{width:var(--card-w);background:#fff;padding:20px;border-radius:12px;box-shadow:0 10px 30px rgba(12,30,60,.08);box-sizing:border-box}
+    .card{width:var(--card-w);background:#fff;padding:22px;border-radius:12px;box-shadow:0 12px 30px rgba(12,30,60,.08);box-sizing:border-box}
     h1{margin:0 0 14px;font-size:20px;text-align:center;color:#111}
     label{display:block;margin-top:10px;font-size:13px;color:#333}
-    input{width:100%;padding:10px;margin-top:6px;border-radius:8px;border:1px solid #e0e6ee;box-sizing:border-box;font-size:14px}
-    .modeRow{display:flex;gap:8px;margin-bottom:12px}
-    .modeBtn{flex:1;padding:8px;border-radius:8px;border:1px solid #d6dbe0;background:#fff;color:var(--blue);font-weight:700;cursor:pointer}
-    .modeBtn.active{background:var(--blue);color:#fff;border-color:var(--blue)}
-    .actionWrap{display:flex;justify-content:center;margin-top:12px}
-    .actionBtn{width:220px;padding:10px;border-radius:10px;border:none;background:var(--blue);color:#fff;font-weight:700;cursor:pointer}
+    input{width:100%;padding:10px;margin-top:6px;border-radius:8px;border:1px solid #e6edf5;box-sizing:border-box;font-size:14px}
+    .navRow{display:flex;gap:8px;margin-bottom:12px;justify-content:center}
+    .navBtn{flex:1;padding:8px;border-radius:8px;border:1px solid #d6e3fb;background:#fff;color:var(--blue);font-weight:700;cursor:pointer}
+    .navBtn.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+    .actionWrap{display:flex;justify-content:center;margin-top:14px}
+    .actionBtn{width:240px;padding:10px;border-radius:10px;border:none;background:var(--blue);color:#fff;font-weight:700;cursor:pointer}
+    .linkRow{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
     .linkBtn{background:transparent;color:var(--blue);border:none;padding:8px 0;cursor:pointer;font-weight:600}
-    .small{font-size:13px;color:#555;margin-top:10px;text-align:center}
-    .profile{display:none;margin-top:10px}
-    .profile div{margin-top:8px}
-    .btnDanger{background:var(--danger)}
+    .small{font-size:13px;color:#555;margin-top:12px;text-align:center}
     .msg{height:20px;margin-top:10px;text-align:center;font-size:13px;color:#b00}
+    .profile{display:none;margin-top:10px}
+    .profileRow{display:flex;justify-content:space-between;margin-top:10px}
+    .btnDanger{background:var(--danger)}
+    .hidden{display:none}
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Homen</h1>
+  <div class="card" role="main">
+    <h1 id="pageTitle">Sign Up</h1>
 
-    <div class="modeRow">
-      <button id="showSignup" class="modeBtn active">Sign Up</button>
-      <button id="showLogin" class="modeBtn">Login</button>
+    <div class="navRow" aria-hidden="false">
+      <button id="navSignup" class="navBtn active" type="button">Sign Up</button>
+      <button id="navLogin" class="navBtn" type="button">Login</button>
     </div>
 
-    <div id="authArea">
+    <!-- Sign Up view -->
+    <div id="signupView" class="view">
+      <label for="suEmail">Email</label>
+      <input id="suEmail" type="email" placeholder="you@example.com" autocomplete="email" />
+      <label for="suPassword">Password</label>
+      <input id="suPassword" type="password" placeholder="Create a password" autocomplete="new-password" />
+
+      <div class="actionWrap">
+        <button id="registerBtn" class="actionBtn" type="button">Register</button>
+      </div>
+
+      <div class="linkRow" style="margin-top:12px">
+        <div style="font-size:13px;color:#666">Already have an account?</div>
+        <a href="#login" id="toLoginLink" style="color:var(--blue);font-weight:700;text-decoration:none">Login</a>
+      </div>
+
+      <div class="small">After signup you will be logged in and a user node will be created</div>
+    </div>
+
+    <!-- Login view -->
+    <div id="loginView" class="view hidden">
+      <label for="liEmail">Email</label>
+      <input id="liEmail" type="email" placeholder="you@example.com" autocomplete="email" />
+      <label for="liPassword">Password</label>
+      <input id="liPassword" type="password" placeholder="Password" autocomplete="current-password" />
+
+      <div class="actionWrap">
+        <button id="loginBtn" class="actionBtn" type="button">Login</button>
+      </div>
+
+      <div class="linkRow">
+        <button id="forgotBtn" class="linkBtn" type="button">Forgot password?</button>
+        <a href="#signup" id="toSignupLink" style="color:var(--blue);font-weight:700;text-decoration:none">Sign up</a>
+      </div>
+
+      <div class="small">After login you will see coins and high score</div>
+    </div>
+
+    <!-- Profile / dashboard view (shown after login) -->
+    <div id="profileView" class="profile hidden" aria-live="polite">
+      <div id="welcomeText" style="font-weight:700;text-align:center"></div>
+      <div class="profileRow">
+        <div><strong>Coins:</strong> <span id="coins">0</span></div>
+        <div><strong>High Score:</strong> <span id="highScore">0</span></div>
+      </div>
+
+      <label style="margin-top:12px">Submit Score</label>
+      <input id="scoreInput" type="number" placeholder="Enter score (e.g., 100)" />
+      <label style="margin-top:8px">Coins Earned</label>
+      <input id="coinsInput" type="number" placeholder="Coins earned (e.g., 5)" />
+
+      <div class="actionWrap" style="margin-top:10px">
+        <button id="submitScoreBtn" class="actionBtn" type="button">Submit Score</button>
+      </div>
+      <div class="actionWrap" style="margin-top:8px">
+        <button id="logoutBtn" class="actionBtn btnDanger" type="button">Logout</button>
+      </div>
+    </div>
+
+    <div id="msg" class="msg" role="status" aria-live="polite"></div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+    import { getDatabase, ref, set, get, runTransaction } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+
+    // ======= FIREBASE CONFIG (your project) =======
+    const firebaseConfig = {
+      apiKey: "AIzaSyD8Vz9WCsGwvs8a3hm0smPFysM0lMnF2uY",
+      authDomain: "data-c6b63.firebaseapp.com",
+      databaseURL: "https://data-c6b63-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "data-c6b63",
+      storageBucket: "data-c6b63.firebasestorage.app",
+      messagingSenderId: "473217478100",
+      appId: "1:473217478100:web:e9508960991a17dfa1fa41",
+      measurementId: "G-8P4JRVVCTR"
+    };
+    // ============================================
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+
+    // Views & UI
+    const navSignup = document.getElementById('navSignup');
+    const navLogin = document.getElementById('navLogin');
+    const signupView = document.getElementById('signupView');
+    const loginView = document.getElementById('loginView');
+    const profileView = document.getElementById('profileView');
+    const pageTitle = document.getElementById('pageTitle');
+    const msgEl = document.getElementById('msg');
+
+    // Signup inputs
+    const suEmail = document.getElementById('suEmail');
+    const suPassword = document.getElementById('suPassword');
+    const registerBtn = document.getElementById('registerBtn');
+
+    // Login inputs
+    const liEmail = document.getElementById('liEmail');
+    const liPassword = document.getElementById('liPassword');
+    const loginBtn = document.getElementById('loginBtn');
+    const forgotBtn = document.getElementById('forgotBtn');
+
+    // Profile elements
+    const welcomeText = document.getElementById('welcomeText');
+    const coinsEl = document.getElementById('coins');
+    const highScoreEl = document.getElementById('highScore');
+    const scoreInput = document.getElementById('scoreInput');
+    const coinsInput = document.getElementById('coinsInput');
+    const submitScoreBtn = document.getElementById('submitScoreBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    // Navigation helpers
+    function showMsg(text, color = '#b00') {
+      msgEl.style.color = color;
+      msgEl.textContent = text;
+      setTimeout(() => { if (msgEl.textContent === text) msgEl.textContent = ''; }, 4500);
+    }
+
+    function setActiveNav(view) {
+      navSignup.classList.toggle('active', view === 'signup');
+      navLogin.classList.toggle('active', view === 'login');
+      signupView.classList.toggle('hidden', view !== 'signup');
+      loginView.classList.toggle('hidden', view !== 'login');
+      profileView.classList.add('hidden');
+      pageTitle.textContent = view === 'signup' ? 'Sign Up' : 'Login';
+      msgEl.textContent = '';
+    }
+
+    navSignup.addEventListener('click', () => { location.hash = '#signup'; });
+    navLogin.addEventListener('click', () => { location.hash = '#login'; });
+
+    // Hash routing (simple)
+    function handleHash() {
+      const h = location.hash.replace('#','') || 'signup';
+      if (h === 'signup') setActiveNav('signup');
+      else if (h === 'login') setActiveNav('login');
+      else setActiveNav('signup');
+    }
+    window.addEventListener('hashchange', handleHash);
+    handleHash();
+
+    // Register
+    registerBtn.addEventListener('click', async () => {
+      const email = suEmail.value.trim();
+      const password = suPassword.value;
+      if (!email || !password) return showMsg('Enter email and password');
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        const uid = cred.user.uid;
+        await set(ref(db, 'users/' + uid), { email, coins: 0, high_score: 0, createdAt: Date.now(), hasPassword: true });
+        showMsg('Registered and logged in', '#080');
+      } catch (err) {
+        showMsg(err.message || 'Register failed');
+      }
+    });
+
+    // Login
+    loginBtn.addEventListener('click', async () => {
+      const email = liEmail.value.trim();
+      const password = liPassword.value;
+      if (!email || !password) return showMsg('Enter email and password');
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        showMsg('Logged in', '#080');
+      } catch (err) {
+        showMsg(err.message || 'Login failed');
+      }
+    });
+
+    // Forgot password
+    forgotBtn.addEventListener('click', async () => {
+      const email = liEmail.value.trim();
+      if (!email) return showMsg('Enter your email to reset password');
+      try {
+        await sendPasswordResetEmail(auth, email);
+        showMsg('If an account exists, a reset email has been sent', '#080');
+      } catch (err) {
+        console.error('reset error', err);
+        if (err.code === 'auth/unauthorized-domain') showMsg('Add your site domain to Firebase Authorized domains');
+        else if (err.code === 'auth/invalid-email') showMsg('Invalid email address');
+        else showMsg('If an account exists, a reset email has been sent', '#080');
+      }
+    });
+
+    // Logout
+    logoutBtn.addEventListener('click', async () => {
+      await signOut(auth);
+      showMsg('Logged out', '#333');
+    });
+
+    // Submit score (atomic)
+    submitScoreBtn.addEventListener('click', async () => {
+      const score = parseInt(scoreInput.value || '0', 10);
+      const coinsEarned = parseInt(coinsInput.value || '0', 10);
+      const user = auth.currentUser;
+      if (!user) return showMsg('Not logged in');
+      if (isNaN(score) || isNaN(coinsEarned)) return showMsg('Enter valid numbers');
+      const userRef = ref(db, 'users/' + user.uid);
+      try {
+        await runTransaction(userRef, (current) => {
+          if (current === null) return current;
+          const newCoins = (current.coins || 0) + coinsEarned;
+          const newHigh = Math.max(current.high_score || 0, score);
+          return { ...current, coins: newCoins, high_score: newHigh };
+        });
+        await loadProfile(user.uid);
+        showMsg('Score submitted', '#080');
+      } catch (err) {
+        showMsg(err.message || 'Submit failed');
+      }
+    });
+
+    // Load profile
+    async function loadProfile(uid) {
+      const snap = await get(ref(db, 'users/' + uid));
+      if (!snap.exists()) return;
+      const data = snap.val();
+      welcomeText.textContent = 'Logged in as ' + (data.email || uid);
+      coinsEl.textContent = data.coins ?? 0;
+      highScoreEl.textContent = data.high_score ?? 0;
+    }
+
+    // Auth state listener: show profile when logged in
+    onAuthStateChanged(auth, async user => {
+      if (user) {
+        // hide auth views, show profile
+        signupView.classList.add('hidden');
+        loginView.classList.add('hidden');
+        navSignup.classList.remove('active');
+        navLogin.classList.remove('active');
+        pageTitle.textContent = 'Profile';
+        profileView.classList.remove('hidden');
+        await loadProfile(user.uid);
+      } else {
+        // show auth views based on hash
+        profileView.classList.add('hidden');
+        handleHash();
+      }
+    });
+
+    // Optional: focus first input on view change
+    window.addEventListener('hashchange', () => {
+      setTimeout(() => {
+        if (!signupView.classList.contains('hidden')) suEmail.focus();
+        else if (!loginView.classList.contains('hidden')) liEmail.focus();
+      }, 50);
+    });
+  </script>
+</body>
+</html>    <div id="authArea">
       <label for="email">Email</label>
       <input id="email" type="email" placeholder="you@example.com" autocomplete="email" />
       <label for="password">Password</label>
