@@ -2,69 +2,101 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Homen - Auth + Realtime DB</title>
+  <title>Homen — Sign up / Login</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body{font-family:system-ui,Arial;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f3f6fb}
-    .card{width:360px;background:#fff;padding:18px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.08)}
-    h1{margin:0 0 12px;font-size:20px}
+    :root{--blue:#0b76ff;--danger:#e74c3c;--card-w:420px}
+    html,body{height:100%;margin:0}
+    body{font-family:system-ui,Arial,Helvetica,sans-serif;display:flex;align-items:center;justify-content:center;background:#f3f6fb;padding:20px}
+    .card{width:var(--card-w);background:#fff;padding:22px;border-radius:12px;box-shadow:0 12px 30px rgba(12,30,60,.08);box-sizing:border-box}
+    h1{margin:0 0 14px;font-size:20px;text-align:center;color:#111}
     label{display:block;margin-top:10px;font-size:13px;color:#333}
-    input{width:100%;padding:8px;margin-top:6px;border-radius:6px;border:1px solid #d6dbe0;box-sizing:border-box}
-    .row{display:flex;gap:8px;margin-top:10px}
-    .half{flex:1}
-    button{width:100%;padding:10px;border-radius:8px;border:none;background:#0b76ff;color:#fff;font-weight:600;cursor:pointer}
-    .danger{background:#e74c3c}
-    .small{font-size:13px;color:#555;margin-top:8px;text-align:center}
-    .modeRow{display:flex;gap:8px;margin-bottom:12px}
-    .modeBtn{flex:1;padding:8px;border-radius:8px;border:1px solid #d6dbe0;background:#fff;color:#0b76ff;font-weight:700;cursor:pointer}
-    .modeBtn.active{background:#0b76ff;color:#fff;border-color:#0b76ff}
-    .linkBtn{background:transparent;color:#0b76ff;border:none;padding:6px 0;cursor:pointer;font-weight:600}
+    input{width:100%;padding:10px;margin-top:6px;border-radius:8px;border:1px solid #e6edf5;box-sizing:border-box;font-size:14px}
+    .navRow{display:flex;gap:8px;margin-bottom:12px;justify-content:center}
+    .navBtn{flex:1;padding:8px;border-radius:8px;border:1px solid #d6e3fb;background:#fff;color:var(--blue);font-weight:700;cursor:pointer}
+    .navBtn.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+    .actionWrap{display:flex;justify-content:center;margin-top:14px}
+    .actionBtn{width:240px;padding:10px;border-radius:10px;border:none;background:var(--blue);color:#fff;font-weight:700;cursor:pointer}
+    .linkRow{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
+    .linkBtn{background:transparent;color:var(--blue);border:none;padding:8px 0;cursor:pointer;font-weight:600}
+    .small{font-size:13px;color:#555;margin-top:12px;text-align:center}
+    .msg{height:22px;margin-top:10px;text-align:center;font-size:13px;color:#b00}
+    .profile{display:none;margin-top:10px}
+    .profileRow{display:flex;justify-content:space-between;margin-top:10px}
+    .btnDanger{background:var(--danger)}
+    .hidden{display:none !important}
+    a { color: var(--blue); text-decoration: none; font-weight:700 }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Menu</h1>
+  <div class="card" role="main" aria-labelledby="pageTitle">
+    <h1 id="pageTitle">Sign Up</h1>
 
-    <!-- New: Sign Up / Login buttons before the prompt -->
-    <div class="modeRow">
-      <button id="showSignup" class="modeBtn active">Sign Up</button>
-      <button id="showLogin" class="modeBtn">Login</button>
+    <div class="navRow" aria-hidden="false">
+      <button id="navSignup" class="navBtn active" type="button" aria-pressed="true">Sign Up</button>
+      <button id="navLogin" class="navBtn" type="button" aria-pressed="false">Login</button>
     </div>
 
-    <div id="authArea">
-      <label>Email</label>
-      <input id="email" type="email" placeholder="you@example.com" />
-      <label>Password</label>
-      <input id="password" type="password" placeholder="password" />
-      <div class="row" style="margin-top:10px;">
-        <button id="registerBtn" class="half">Register</button>
-        <button id="loginBtn" class="half">Login</button>
+    <!-- SIGNUP VIEW (single instance) -->
+    <section id="signupView" aria-labelledby="pageTitle">
+      <label for="suEmail">Email</label>
+      <input id="suEmail" type="email" placeholder="you@example.com" autocomplete="email" />
+      <label for="suPassword">Password</label>
+      <input id="suPassword" type="password" placeholder="Create a password" autocomplete="new-password" />
+
+      <div class="actionWrap">
+        <button id="registerBtn" class="actionBtn" type="button">Register</button>
       </div>
 
-      <!-- Forgot password button -->
-      <div style="display:flex;justify-content:center;margin-top:8px;">
-        <button id="forgotBtn" class="linkBtn">I forgot my password</button>
+      <div class="linkRow" style="margin-top:12px">
+        <div style="font-size:13px;color:#666">Already have an account?</div>
+        <a href="#login" id="toLoginLink">Login</a>
+      </div>
+
+      <div class="small">After signup you will be logged in and a user node will be created</div>
+    </section>
+
+    <!-- LOGIN VIEW (single instance) -->
+    <section id="loginView" class="hidden" aria-hidden="true">
+      <label for="liEmail">Email</label>
+      <input id="liEmail" type="email" placeholder="you@example.com" autocomplete="email" />
+      <label for="liPassword">Password</label>
+      <input id="liPassword" type="password" placeholder="Password" autocomplete="current-password" />
+
+      <div class="actionWrap">
+        <button id="loginBtn" class="actionBtn" type="button">Login</button>
+      </div>
+
+      <div class="linkRow">
+        <button id="forgotBtn" class="linkBtn" type="button">Forgot password?</button>
+        <a href="#signup" id="toSignupLink">Sign up</a>
       </div>
 
       <div class="small">After login you will see coins and high score</div>
-    </div>
+    </section>
 
-    <div id="profileArea" style="display:none;">
-      <div class="small" id="welcomeText"></div>
-      <div style="margin-top:10px">
+    <!-- PROFILE VIEW (single instance) -->
+    <section id="profileView" class="profile hidden" aria-live="polite">
+      <div id="welcomeText" style="font-weight:700;text-align:center"></div>
+      <div class="profileRow">
         <div><strong>Coins:</strong> <span id="coins">0</span></div>
-        <div style="margin-top:6px"><strong>High Score:</strong> <span id="highScore">0</span></div>
+        <div><strong>High Score:</strong> <span id="highScore">0</span></div>
       </div>
 
       <label style="margin-top:12px">Submit Score</label>
       <input id="scoreInput" type="number" placeholder="Enter score (e.g., 100)" />
       <label style="margin-top:8px">Coins Earned</label>
-      <input id="coinsInput" type="number" placeholder="Coins earned this round (e.g., 5)" />
-      <button id="submitScoreBtn">Submit Score</button>
-      <button id="logoutBtn" class="danger" style="margin-top:8px">Logout</button>
-    </div>
+      <input id="coinsInput" type="number" placeholder="Coins earned (e.g., 5)" />
 
-    <div id="msg" class="small" style="margin-top:10px;color:#b00"></div>
+      <div class="actionWrap" style="margin-top:10px">
+        <button id="submitScoreBtn" class="actionBtn" type="button">Submit Score</button>
+      </div>
+      <div class="actionWrap" style="margin-top:8px">
+        <button id="logoutBtn" class="actionBtn btnDanger" type="button">Logout</button>
+      </div>
+    </section>
+
+    <div id="msg" class="msg" role="status" aria-live="polite"></div>
   </div>
 
   <script type="module">
@@ -72,7 +104,7 @@
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
     import { getDatabase, ref, set, get, runTransaction } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 
-    // ======= PASTED FIREBASE CONFIG =======
+    // ======= FIREBASE CONFIG (your project) =======
     const firebaseConfig = {
       apiKey: "AIzaSyD8Vz9WCsGwvs8a3hm0smPFysM0lMnF2uY",
       authDomain: "data-c6b63.firebaseapp.com",
@@ -83,21 +115,33 @@
       appId: "1:473217478100:web:e9508960991a17dfa1fa41",
       measurementId: "G-8P4JRVVCTR"
     };
-    // =====================================
+    // ============================================
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getDatabase(app);
 
-    // UI
-    const emailEl = document.getElementById('email');
-    const passEl = document.getElementById('password');
+    // UI refs
+    const navSignup = document.getElementById('navSignup');
+    const navLogin = document.getElementById('navLogin');
+    const signupView = document.getElementById('signupView');
+    const loginView = document.getElementById('loginView');
+    const profileView = document.getElementById('profileView');
+    const pageTitle = document.getElementById('pageTitle');
+    const msgEl = document.getElementById('msg');
+
+    // Signup inputs
+    const suEmail = document.getElementById('suEmail');
+    const suPassword = document.getElementById('suPassword');
     const registerBtn = document.getElementById('registerBtn');
+
+    // Login inputs
+    const liEmail = document.getElementById('liEmail');
+    const liPassword = document.getElementById('liPassword');
     const loginBtn = document.getElementById('loginBtn');
     const forgotBtn = document.getElementById('forgotBtn');
-    const msgEl = document.getElementById('msg');
-    const profileArea = document.getElementById('profileArea');
-    const authArea = document.getElementById('authArea');
+
+    // Profile elements
     const welcomeText = document.getElementById('welcomeText');
     const coinsEl = document.getElementById('coins');
     const highScoreEl = document.getElementById('highScore');
@@ -106,45 +150,44 @@
     const submitScoreBtn = document.getElementById('submitScoreBtn');
     const logoutBtn = document.getElementById('logoutBtn');
 
-    // New mode buttons
-    const showSignup = document.getElementById('showSignup');
-    const showLogin = document.getElementById('showLogin');
-
-    function setMode(mode) {
-      // mode: 'signup' or 'login'
-      if (mode === 'signup') {
-        showSignup.classList.add('active');
-        showLogin.classList.remove('active');
-        registerBtn.style.display = 'inline-block';
-        loginBtn.style.display = 'inline-block';
-        // prefer register focus
-        emailEl.focus();
-      } else {
-        showSignup.classList.remove('active');
-        showLogin.classList.add('active');
-        registerBtn.style.display = 'inline-block';
-        loginBtn.style.display = 'inline-block';
-        emailEl.focus();
-      }
-    }
-
-    // Wire top buttons to toggle visual state (keeps both register/login visible for clarity)
-    showSignup.addEventListener('click', () => setMode('signup'));
-    showLogin.addEventListener('click', () => setMode('login'));
-
-    // initial mode
-    setMode('signup');
-
     function showMsg(text, color = '#b00') {
       msgEl.style.color = color;
       msgEl.textContent = text;
-      setTimeout(()=> { msgEl.textContent = ''; }, 4000);
+      setTimeout(() => { if (msgEl.textContent === text) msgEl.textContent = ''; }, 4500);
     }
 
-    // Register: create auth user and user node in Realtime DB
+    function setActive(view) {
+      navSignup.classList.toggle('active', view === 'signup');
+      navLogin.classList.toggle('active', view === 'login');
+      signupView.classList.toggle('hidden', view !== 'signup');
+      loginView.classList.toggle('hidden', view !== 'login');
+      profileView.classList.add('hidden');
+      pageTitle.textContent = view === 'signup' ? 'Sign Up' : 'Login';
+      msgEl.textContent = '';
+      signupView.setAttribute('aria-hidden', view !== 'signup');
+      loginView.setAttribute('aria-hidden', view !== 'login');
+      navSignup.setAttribute('aria-pressed', view === 'signup');
+      navLogin.setAttribute('aria-pressed', view === 'login');
+    }
+
+    // Nav wiring
+    navSignup.addEventListener('click', () => { location.hash = '#signup'; });
+    navLogin.addEventListener('click', () => { location.hash = '#login'; });
+    document.getElementById('toLoginLink').addEventListener('click', (e) => { e.preventDefault(); location.hash = '#login'; });
+    document.getElementById('toSignupLink').addEventListener('click', (e) => { e.preventDefault(); location.hash = '#signup'; });
+
+    function handleHash() {
+      const h = (location.hash || '#signup').replace('#','');
+      if (h === 'login') setActive('login');
+      else setActive('signup');
+    }
+    window.addEventListener('hashchange', handleHash);
+    handleHash();
+
+    // Register
     registerBtn.addEventListener('click', async () => {
-      const email = emailEl.value.trim();
-      const password = passEl.value;
+      const email = suEmail.value.trim();
+      const password = suPassword.value;
       if (!email || !password) return showMsg('Enter email and password');
       try {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
@@ -158,8 +201,8 @@
 
     // Login
     loginBtn.addEventListener('click', async () => {
-      const email = emailEl.value.trim();
-      const password = passEl.value;
+      const email = liEmail.value.trim();
+      const password = liPassword.value;
       if (!email || !password) return showMsg('Enter email and password');
       try {
         await signInWithEmailAndPassword(auth, email, password);
@@ -169,17 +212,18 @@
       }
     });
 
-    // Forgot password: send reset email
+    // Forgot password
     forgotBtn.addEventListener('click', async () => {
-      const email = emailEl.value.trim();
+      const email = liEmail.value.trim();
       if (!email) return showMsg('Enter your email to reset password');
       try {
-        // Send password reset email. Message is intentionally neutral to avoid revealing account existence.
         await sendPasswordResetEmail(auth, email);
-        showMsg('If an account exists, a password reset email has been sent', '#080');
+        showMsg('If an account exists, a reset email has been sent', '#080');
       } catch (err) {
-        // For UX, still show neutral message on common errors like user-not-found
-        showMsg('If an account exists, a password reset email has been sent', '#080');
+        console.error('reset error', err);
+        if (err.code === 'auth/unauthorized-domain') showMsg('Add your site domain to Firebase Authorized domains');
+        else if (err.code === 'auth/invalid-email') showMsg('Invalid email address');
+        else showMsg('If an account exists, a reset email has been sent', '#080');
       }
     });
 
@@ -189,15 +233,14 @@
       showMsg('Logged out', '#333');
     });
 
-    // Submit score: increment coins and update high score if higher
+    // Submit score
     submitScoreBtn.addEventListener('click', async () => {
       const score = parseInt(scoreInput.value || '0', 10);
       const coinsEarned = parseInt(coinsInput.value || '0', 10);
       const user = auth.currentUser;
       if (!user) return showMsg('Not logged in');
       if (isNaN(score) || isNaN(coinsEarned)) return showMsg('Enter valid numbers');
-      const userRef = ref(db, 'users/' + user.uid);9ok9
-
+      const userRef = ref(db, 'users/' + user.uid);
       try {
         await runTransaction(userRef, (current) => {
           if (current === null) return current;
@@ -212,7 +255,7 @@
       }
     });
 
-    // Load profile from Realtime DB
+    // Load profile
     async function loadProfile(uid) {
       const snap = await get(ref(db, 'users/' + uid));
       if (!snap.exists()) return;
@@ -225,17 +268,29 @@
     // Auth state listener
     onAuthStateChanged(auth, async user => {
       if (user) {
-        authArea.style.display = 'none';
-        profileArea.style.display = 'block';
+        signupView.classList.add('hidden');
+        loginView.classList.add('hidden');
+        navSignup.classList.remove('active');
+        navLogin.classList.remove('active');
+        pageTitle.textContent = 'Profile';
+        profileView.classList.remove('hidden');
         await loadProfile(user.uid);
       } else {
-        authArea.style.display = 'block';
-        profileArea.style.display = 'none';
+        profileView.classList.add('hidden');
+        handleHash();
       }
+    });
+
+    // Focus first input on view change
+    window.addEventListener('hashchange', () => {
+      setTimeout(() => {
+        if (!signupView.classList.contains('hidden')) suEmail.focus();
+        else if (!loginView.classList.contains('hidden')) liEmail.focus();
+      }, 50);
     });
   </script>
 </body>
-</html>      <button id="navLogin" class="navBtn" type="button" aria-pressed="false">Login</button>
+</html>" class="navBtn" type="button" aria-pressed="false">Login</button>
     </div>
 
     <!-- SIGNUP VIEW -->
