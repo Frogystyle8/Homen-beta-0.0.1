@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Simple Auth — Firebase</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{--blue:#0b76ff;--danger:#e74c3c;--card-w:420px}
+    html,body{height:100%;margin:0}
+    body{font-family:system-ui,Arial,Helvetica,sans-serif;display:flex;align-items:center;justify-content:center;background:#f3f6fb;padding:20px}
+    .card{width:var(--card-w);background:#fff;padding:20px;border-radius:12px;box-shadow:0 10px 30px rgba(12,30,60,.08);box-sizing:border-box}
+    h1{margin:0 0 12px;font-size:20px;text-align:center}
+    label{display:block;margin-top:10px;font-size:13px;color:#333}
+    input{width:100%;padding:10px;margin-top:6px;border-radius:8px;border:1px solid #e6edf5;box-sizing:border-box;font-size:14px}
+    .row{display:flex;gap:8px;margin-top:12px}
+    .btn{flex:1;padding:10px;border-radius:10px;border:none;background:var(--blue);color:#fff;font-weight:700;cursor:pointer}
+    .btn.secondary{background:#fff;color:var(--blue);border:1px solid #d6e3fb}
+    .small{font-size:13px;color:#555;margin-top:12px;text-align:center}
+    .msg{height:22px;margin-top:10px;text-align:center;font-size:13px;color:#b00}
+    .hidden{display:none !important}
+    .profile{display:none;margin-top:12px}
+    .profileRow{display:flex;justify-content:space-between;margin-top:10px}
+    .danger{background:var(--danger)}
+    .compact{padding:8px;font-size:13px;border-radius:8px}
+  </style>
+</head>
+<body>
+  <div class="card" role="main" aria-live="polite">
+    <h1 id="pageTitle">Sign Up</h1>
+
+    <!-- Mode buttons -->
+    <div class="row" id="modeRow">
+      <button id="signupBtn" class="btn secondary compact" type="button">Sign Up</button>
+      <button id="loginBtn" class="btn compact" type="button">Login</button>
+    </div>
+
+    <!-- Auth inputs -->
+    <label for="email">Email</label>
+    <input id="email" type="email" placeholder="you@example.com" autocomplete="email" />
+
+    <label for="password">Password</label>
+    <input id="password" type="password" placeholder="password" autocomplete="current-password" />
+
+    <div class="row" style="margin-top:12px;">
+      <button id="actionPrimary" class="btn" type="button">Create account</button>
+      <button id="forgot" class="btn secondary compact hidden" type="button">Reset</button>
+    </div>
+
+    <div class="small">After login you will see coins and high score</div>
+
+    <!-- Profile area -->
+    <section id="profile" class="profile" aria-live="polite">
+      <div id="welcome" style="font-weight:700;text-align:center;margin-top:10px"></div>
+      <div class="profileRow">
+        <div><strong>Coins:</strong> <span id="coins">0</span></div>
+        <div><strong>High Score:</strong> <span id="highScore">0</span></div>
+      </div>
+
+      <label style="margin-top:12px">Submit Score</label>
+      <input id="score" type="number" placeholder="Score (e.g., 100)" />
+
+      <label style="margin-top:8px">Coins Earned</label>
+      <input id="coinsEarned" type="number" placeholder="Coins (e.g., 5)" />
+
+      <div class="row" style="margin-top:10px;">
+        <button id="submitScore" class="btn compact" type="button">Submit</button>
+        <button id="signOut" class="btn danger compact" type="button">Logout</button>
+      </div>
+    </section>
+
+    <div id="msg" class="msg" role="status" aria-live="polite"></div>
+  </div>
+
+  <script type="module">
+    // Firebase modular SDK imports
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import {
+      getAuth,
+      createUserWithEmailAndPassword,
+      signInWithEmailAndPassword,
+      signOut,
+      onAuthStateChanged,
+      sendPasswordResetEmail
+    } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+    import {
+      getDatabase,
+      ref,
+      set,
+      get,
+      runTransaction
+    } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+
+    // ---------- FIREBASE CONFIGURATION ----------
+    // Replace these values with your Firebase project config if you want to use your own project.
+    const firebaseConfig = {
+      apiKey: "AIzaSyD8Vz9WCsGwvs8a3hm0smPFysM0lMnF2uY",
+      authDomain: "data-c6b63.firebaseapp.com",
+      databaseURL: "https://data-c6b63-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "data-c6b63",
+      storageBucket: "data-c6b63.firebasestorage.app",
+      messagingSenderId: "473217478100",
+      appId: "1:473217478100:web:e9508960991a17dfa1fa41",
+      measurementId: "G-8P4JRVVCTR"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+
+    // ---------- ELEMENTS ----------
+    const signupBtn = document.getElementById('signupBtn');
+    const loginBtn = document.getElementById('loginBtn');
+    const pageTitle = document.getElementById('pageTitle');
+
+    const emailEl = document.getElementById('email');
+    const passEl = document.getElementById('password');
+    const actionPrimary = document.getElementById('actionPrimary');
+    const forgotBtn = document.getElementById('forgot');
+
+    const msgEl = document.getElementById('msg');
+
+    const profileSection = document.getElementById('profile');
+    const welcomeEl = document.getElementById('welcome');
+    const coinsEl = document.getElementById('coins');
+    const highScoreEl = document.getElementById('highScore');
+    const scoreEl = document.getElementById('score');
+    const coinsEarnedEl = document.getElementById('coinsEarned');
+    const submitScoreBtn = document.getElementById('submitScore');
+    const signOutBtn = document.getElementById('signOut');
+
+    // ---------- UI MODE ----------
+    let mode = 'signup'; // 'signup' or 'login'
+    function setMode(m) {
+      mode = m;
+      if (m === 'signup') {
+        pageTitle.textContent = 'Sign Up';
+        actionPrimary.textContent = 'Create account';
+        forgotBtn.classList.add('hidden');
+        signupBtn.classList.add('secondary');
+        loginBtn.classList.remove('secondary');
+      } else {
+        pageTitle.textContent = 'Login';
+        actionPrimary.textContent = 'Sign in';
+        forgotBtn.classList.remove('hidden');
+        signupBtn.classList.remove('secondary');
+        loginBtn.classList.add('secondary');
+      }
+      msg('');
+      emailEl.focus();
+    }
+
+    signupBtn.addEventListener('click', () => setMode('signup'));
+    loginBtn.addEventListener('click', () => setMode('login'));
+    setMode('signup');
+
+    // ---------- Helpers ----------
+    function msg(text = '', color = '#b00') {
+      msgEl.style.color = color;
+      msgEl.textContent = text;
+      if (text) setTimeout(() => { if (msgEl.textContent === text) msgEl.textContent = ''; }, 4500);
+    }
+
+    function friendlyError(err) {
+      // Map common Firebase auth codes to short messages
+      if (!err || !err.code) return 'Operation failed';
+      const map = {
+        'auth/email-already-in-use': 'Email already in use',
+        'auth/invalid-email': 'Invalid email',
+        'auth/weak-password': 'Weak password',
+        'auth/wrong-password': 'Wrong password',
+        'auth/user-not-found': 'No account found',
+        'auth/too-many-requests': 'Too many attempts, try later',
+        'auth/unauthorized-domain': 'Auth domain not authorized'
+      };
+      return map[err.code] || err.message || 'Operation failed';
+    }
+
+    // ---------- Auth actions ----------
+    actionPrimary.addEventListener('click', async () => {
+      const email = emailEl.value.trim();
+      const password = passEl.value;
+      if (!email || !password) return msg('Enter email and password');
+
+      if (mode === 'signup') {
+        try {
+          const cred = await createUserWithEmailAndPassword(auth, email, password);
+          // create initial DB record
+          await set(ref(db, 'users/' + cred.user.uid), {
+            email,
+            coins: 0,
+            high_score: 0,
+            createdAt: Date.now()
+          });
+          msg('Account created', '#080');
+        } catch (err) {
+          msg(friendlyError(err));
+        }
+      } else {
+        try {
+          await signInWithEmailAndPassword(auth, email, password);
+          msg('Logged in', '#080');
+        } catch (err) {
+          msg(friendlyError(err));
+        }
+      }
+    });
+
+    forgotBtn.addEventListener('click', async () => {
+      const email = emailEl.value.trim();
+      if (!email) return msg('Enter your email to reset password');
+      try {
+        await sendPasswordResetEmail(auth, email);
+        msg('If an account exists, a reset email has been sent', '#080');
+      } catch {
+        msg('If an account exists, a reset email has been sent', '#080');
+      }
+    });
+
+    signOutBtn.addEventListener('click', async () => {
+      try {
+        await signOut(auth);
+        msg('Logged out', '#333');
+      } catch {
+        msg('Logout failed');
+      }
+    });
+
+    // ---------- Submit score (atomic) ----------
+    submitScoreBtn.addEventListener('click', async () => {
+      const user = auth.currentUser;
+      if (!user) return msg('Not logged in');
+      const score = parseInt(scoreEl.value || '0', 10);
+      const coinsEarned = parseInt(coinsEarnedEl.value || '0', 10);
+      if (isNaN(score) || isNaN(coinsEarned)) return msg('Enter valid numbers');
+      const userRef = ref(db, 'users/' + user.uid);
+      try {
+        await runTransaction(userRef, (current) => {
+          if (current === null) return current;
+          const newCoins = (current.coins || 0) + coinsEarned;
+          const newHigh = Math.max(current.high_score || 0, score);
+          return { ...current, coins: newCoins, high_score: newHigh };
+        });
+        await loadProfile(user.uid);
+        msg('Score submitted', '#080');
+      } catch {
+        msg('Submit failed');
+      }
+    });
+
+    // ---------- Load profile ----------
+    async function loadProfile(uid) {
+      try {
+        const snap = await get(ref(db, 'users/' + uid));
+        if (!snap.exists()) return;
+        const data = snap.val();
+        welcomeEl.textContent = 'Logged in as ' + (data.email || uid);
+        coinsEl.textContent = data.coins ?? 0;
+        highScoreEl.textContent = data.high_score ?? 0;
+      } catch {
+        // silent
+      }
+    }
+
+    // ---------- Auth state listener ----------
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // show profile
+        pageTitle.textContent = 'Profile';
+        document.getElementById('modeRow').classList.add('hidden');
+        document.querySelector('label[for="email"]').classList.add('hidden');
+        document.querySelector('label[for="password"]').classList.add('hidden');
+        emailEl.classList.add('hidden');
+        passEl.classList.add('hidden');
+        actionPrimary.classList.add('hidden');
+        forgotBtn.classList.add('hidden');
+        profileSection.style.display = 'block';
+        await loadProfile(user.uid);
+      } else {
+        // show auth
+        pageTitle.textContent = 'Sign Up';
+        document.getElementById('modeRow').classList.remove('hidden');
+        document.querySelector('label[for="email"]').classList.remove('hidden');
+        document.querySelector('label[for="password"]').classList.remove('hidden');
+        emailEl.classList.remove('hidden');
+        passEl.classList.remove('hidden');
+        actionPrimary.classList.remove('hidden');
+        profileSection.style.display = 'none';
+        setMode('signup');
+        emailEl.value = '';
+        passEl.value = '';
+      }
+    });
+
+    // Enter key behavior
+    [emailEl, passEl].forEach(el => {
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') actionPrimary.click();
+      });
+    });
+  </script>
+</body>
+</html>
