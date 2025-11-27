@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Homen — Login / Sign up</title>
+  <title>Homen — Sign up / Login</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     :root{--blue:#0b76ff;--danger:#e74c3c;--card-w:420px}
@@ -20,24 +20,25 @@
     .linkRow{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
     .linkBtn{background:transparent;color:var(--blue);border:none;padding:8px 0;cursor:pointer;font-weight:600}
     .small{font-size:13px;color:#555;margin-top:12px;text-align:center}
-    .msg{height:20px;margin-top:10px;text-align:center;font-size:13px;color:#b00}
+    .msg{height:22px;margin-top:10px;text-align:center;font-size:13px;color:#b00}
     .profile{display:none;margin-top:10px}
     .profileRow{display:flex;justify-content:space-between;margin-top:10px}
     .btnDanger{background:var(--danger)}
-    .hidden{display:none}
+    .hidden{display:none !important}
+    a { color: var(--blue); text-decoration: none; font-weight:700 }
   </style>
 </head>
 <body>
-  <div class="card" role="main">
+  <div class="card" role="main" aria-labelledby="pageTitle">
     <h1 id="pageTitle">Sign Up</h1>
 
     <div class="navRow" aria-hidden="false">
-      <button id="navSignup" class="navBtn active" type="button">Sign Up</button>
-      <button id="navLogin" class="navBtn" type="button">Login</button>
+      <button id="navSignup" class="navBtn active" type="button" aria-pressed="true">Sign Up</button>
+      <button id="navLogin" class="navBtn" type="button" aria-pressed="false">Login</button>
     </div>
 
-    <!-- Sign Up view -->
-    <div id="signupView" class="view">
+    <!-- SIGNUP VIEW -->
+    <section id="signupView" aria-labelledby="pageTitle">
       <label for="suEmail">Email</label>
       <input id="suEmail" type="email" placeholder="you@example.com" autocomplete="email" />
       <label for="suPassword">Password</label>
@@ -49,14 +50,14 @@
 
       <div class="linkRow" style="margin-top:12px">
         <div style="font-size:13px;color:#666">Already have an account?</div>
-        <a href="#login" id="toLoginLink" style="color:var(--blue);font-weight:700;text-decoration:none">Login</a>
+        <a href="#login" id="toLoginLink">Login</a>
       </div>
 
       <div class="small">After signup you will be logged in and a user node will be created</div>
-    </div>
+    </section>
 
-    <!-- Login view -->
-    <div id="loginView" class="view hidden">
+    <!-- LOGIN VIEW -->
+    <section id="loginView" class="hidden" aria-hidden="true">
       <label for="liEmail">Email</label>
       <input id="liEmail" type="email" placeholder="you@example.com" autocomplete="email" />
       <label for="liPassword">Password</label>
@@ -68,14 +69,14 @@
 
       <div class="linkRow">
         <button id="forgotBtn" class="linkBtn" type="button">Forgot password?</button>
-        <a href="#signup" id="toSignupLink" style="color:var(--blue);font-weight:700;text-decoration:none">Sign up</a>
+        <a href="#signup" id="toSignupLink">Sign up</a>
       </div>
 
       <div class="small">After login you will see coins and high score</div>
-    </div>
+    </section>
 
-    <!-- Profile / dashboard view (shown after login) -->
-    <div id="profileView" class="profile hidden" aria-live="polite">
+    <!-- PROFILE VIEW -->
+    <section id="profileView" class="profile hidden" aria-live="polite">
       <div id="welcomeText" style="font-weight:700;text-align:center"></div>
       <div class="profileRow">
         <div><strong>Coins:</strong> <span id="coins">0</span></div>
@@ -93,7 +94,7 @@
       <div class="actionWrap" style="margin-top:8px">
         <button id="logoutBtn" class="actionBtn btnDanger" type="button">Logout</button>
       </div>
-    </div>
+    </section>
 
     <div id="msg" class="msg" role="status" aria-live="polite"></div>
   </div>
@@ -103,7 +104,7 @@
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
     import { getDatabase, ref, set, get, runTransaction } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 
-    // ======= FIREBASE CONFIG (your project) =======
+    // ======= FIREBASE CONFIG (from previous file) =======
     const firebaseConfig = {
       apiKey: "AIzaSyD8Vz9WCsGwvs8a3hm0smPFysM0lMnF2uY",
       authDomain: "data-c6b63.firebaseapp.com",
@@ -120,7 +121,7 @@
     const auth = getAuth(app);
     const db = getDatabase(app);
 
-    // Views & UI
+    // Views & elements
     const navSignup = document.getElementById('navSignup');
     const navLogin = document.getElementById('navLogin');
     const signupView = document.getElementById('signupView');
@@ -129,12 +130,12 @@
     const pageTitle = document.getElementById('pageTitle');
     const msgEl = document.getElementById('msg');
 
-    // Signup inputs
+    // Signup elements
     const suEmail = document.getElementById('suEmail');
     const suPassword = document.getElementById('suPassword');
     const registerBtn = document.getElementById('registerBtn');
 
-    // Login inputs
+    // Login elements
     const liEmail = document.getElementById('liEmail');
     const liPassword = document.getElementById('liPassword');
     const loginBtn = document.getElementById('loginBtn');
@@ -156,7 +157,7 @@
       setTimeout(() => { if (msgEl.textContent === text) msgEl.textContent = ''; }, 4500);
     }
 
-    function setActiveNav(view) {
+    function setActive(view) {
       navSignup.classList.toggle('active', view === 'signup');
       navLogin.classList.toggle('active', view === 'login');
       signupView.classList.toggle('hidden', view !== 'signup');
@@ -164,17 +165,23 @@
       profileView.classList.add('hidden');
       pageTitle.textContent = view === 'signup' ? 'Sign Up' : 'Login';
       msgEl.textContent = '';
+      // accessibility
+      signupView.setAttribute('aria-hidden', view !== 'signup');
+      loginView.setAttribute('aria-hidden', view !== 'login');
+      navSignup.setAttribute('aria-pressed', view === 'signup');
+      navLogin.setAttribute('aria-pressed', view === 'login');
     }
 
+    // Simple hash routing and nav wiring
     navSignup.addEventListener('click', () => { location.hash = '#signup'; });
     navLogin.addEventListener('click', () => { location.hash = '#login'; });
+    document.getElementById('toLoginLink').addEventListener('click', (e) => { e.preventDefault(); location.hash = '#login'; });
+    document.getElementById('toSignupLink').addEventListener('click', (e) => { e.preventDefault(); location.hash = '#signup'; });
 
-    // Hash routing (simple)
     function handleHash() {
-      const h = location.hash.replace('#','') || 'signup';
-      if (h === 'signup') setActiveNav('signup');
-      else if (h === 'login') setActiveNav('login');
-      else setActiveNav('signup');
+      const h = (location.hash || '#signup').replace('#','');
+      if (h === 'login') setActive('login');
+      else setActive('signup');
     }
     window.addEventListener('hashchange', handleHash);
     handleHash();
@@ -207,7 +214,7 @@
       }
     });
 
-    // Forgot password
+    // Forgot password (reset email)
     forgotBtn.addEventListener('click', async () => {
       const email = liEmail.value.trim();
       if (!email) return showMsg('Enter your email to reset password');
@@ -216,6 +223,76 @@
         showMsg('If an account exists, a reset email has been sent', '#080');
       } catch (err) {
         console.error('reset error', err);
+        if (err.code === 'auth/unauthorized-domain') showMsg('Add your site domain to Firebase Authorized domains');
+        else if (err.code === 'auth/invalid-email') showMsg('Invalid email address');
+        else showMsg('If an account exists, a reset email has been sent', '#080');
+      }
+    });
+
+    // Logout
+    logoutBtn.addEventListener('click', async () => {
+      await signOut(auth);
+      showMsg('Logged out', '#333');
+    });
+
+    // Submit score (atomic)
+    submitScoreBtn.addEventListener('click', async () => {
+      const score = parseInt(scoreInput.value || '0', 10);
+      const coinsEarned = parseInt(coinsInput.value || '0', 10);
+      const user = auth.currentUser;
+      if (!user) return showMsg('Not logged in');
+      if (isNaN(score) || isNaN(coinsEarned)) return showMsg('Enter valid numbers');
+      const userRef = ref(db, 'users/' + user.uid);
+      try {
+        await runTransaction(userRef, (current) => {
+          if (current === null) return current;
+          const newCoins = (current.coins || 0) + coinsEarned;
+          const newHigh = Math.max(current.high_score || 0, score);
+          return { ...current, coins: newCoins, high_score: newHigh };
+        });
+        await loadProfile(user.uid);
+        showMsg('Score submitted', '#080');
+      } catch (err) {
+        showMsg(err.message || 'Submit failed');
+      }
+    });
+
+    // Load profile
+    async function loadProfile(uid) {
+      const snap = await get(ref(db, 'users/' + uid));
+      if (!snap.exists()) return;
+      const data = snap.val();
+      welcomeText.textContent = 'Logged in as ' + (data.email || uid);
+      coinsEl.textContent = data.coins ?? 0;
+      highScoreEl.textContent = data.high_score ?? 0;
+    }
+
+    // Auth state listener: show profile when logged in
+    onAuthStateChanged(auth, async user => {
+      if (user) {
+        signupView.classList.add('hidden');
+        loginView.classList.add('hidden');
+        navSignup.classList.remove('active');
+        navLogin.classList.remove('active');
+        pageTitle.textContent = 'Profile';
+        profileView.classList.remove('hidden');
+        await loadProfile(user.uid);
+      } else {
+        profileView.classList.add('hidden');
+        handleHash();
+      }
+    });
+
+    // Focus first input on view change
+    window.addEventListener('hashchange', () => {
+      setTimeout(() => {
+        if (!signupView.classList.contains('hidden')) suEmail.focus();
+        else if (!loginView.classList.contains('hidden')) liEmail.focus();
+      }, 50);
+    });
+  </script>
+</body>
+  </html>('reset error', err);
         if (err.code === 'auth/unauthorized-domain') showMsg('Add your site domain to Firebase Authorized domains');
         else if (err.code === 'auth/invalid-email') showMsg('Invalid email address');
         else showMsg('If an account exists, a reset email has been sent', '#080');
