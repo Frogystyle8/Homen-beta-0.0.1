@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Lobby — Create / Join Room</title>
+<style>
+  body{font-family:system-ui,Arial;background:#071018;color:#e6eef6;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+  .card{background:#0b1720;padding:20px;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.6);width:420px}
+  input,button{width:100%;padding:10px;margin-top:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:#071018;color:#e6eef6}
+  .row{display:flex;gap:8px}
+  .small{font-size:13px;color:#9fb6c6;margin-top:8px}
+  .members{margin-top:12px;padding:8px;background:#071826;border-radius:8px;font-size:13px}
+  #startBtn{background:linear-gradient(90deg,#ffd166,#ffb86b);color:#021018;font-weight:800}
+</style>
+</head>
+<body>
+  <div class="card" role="main">
+    <h2>Create or Join Room</h2>
+
+    <label for="gameName">Game username</label>
+    <input id="gameName" placeholder="Your in-game name" />
+
+    <label for="roomInput">Room code (optional)</label>
+    <input id="roomInput" placeholder="Leave empty to create new room" />
+
+    <div class="row">
+      <button id="createBtn">Create Room</button>
+      <button id="joinBtn">Join Room</button>
+    </div>
+
+    <button id="startBtn" style="display:none;margin-top:10px">Start Game (owner)</button>
+
+    <div id="roomInfo" class="small">Not in a room</div>
+    <div id="membersList" class="members" aria-live="polite">No players yet</div>
+  </div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+import { getDatabase, ref, set, update, get, onValue } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD8Vz9WCsGwvs8a3hm0smPFysM0lMnF2uY",
+  authDomain: "data-c6b63.firebaseapp.com",
+  databaseURL: "https://data-c6b63-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "data-c6b63",
+  storageBucket: "data-c6b63.firebasedestorage.app",
+  messagingSenderId: "473217478100",
+  appId: "1:473217478100:web:e9508960991a17dfa1fa41",
+  measurementId: "G-8P4JRVVCTR"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getDatabase(app);
+
+const roomInput = document.getElementById('roomInput');
+const createBtn = document.getElementById('createBtn');
+const joinBtn = document.getElementById('joinBtn');
+const startBtn = document.getElementById('startBtn');
+const gameNameInput = document.getElementById('gameName');
+const roomInfo = document.getElementById('roomInfo');
+const membersList = document.getElementById('membersList');
+
+let currentUser = null;
+let currentRoom = null;
+let roomUnsub = null;
+let membersUnsub = null;
+
+// ensure user signed in (anonymous fallback)
+onAuthStateChanged(auth, user => {
+  if (user) {
+    currentUser = user;
+    roomInfo.textContent = `Signed in as ${user.uid}`;
+  } else {
+    signInAnonymously(auth).catch(e => {
+      console.error('Auth error', e);
+      roomInfo.textContent = 'Auth error';
+    });
+  }
+});
+
+// helper: short room code
+function makeRoomCode(len = 6){
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let s = '';
+  for (let i=0;i<len;i++) s += chars[Math.floor(Math.random()*chars.length)];
+  return s;
+}
+
+// attach listeners for a room (members + metadata)
+function attachRoomListeners(roomCode){
+  // detach previous
+  if (roomUnsub) roomUnsub();
+  if (membersUnsub) membersUnsub();
+
+  const roomRef = ref(db, `rooms/${roomCode}`);
+  const membersRef = ref(db, `rooms/${roomCode}/members`);
+
+  roomUnsub = onValue(roomRef, snap => {
+    const room = snap.exists() ? snap.val() : null;
+    if (!room) return;
+    roomInfo.textContent = `Room ${roomCode} — owner: ${room.ownerGameName || room.owner || '—'} — phase: ${room.phase || 'waiting'}`;
+    // when owner sets phase to countdown3, redirect everyone to game.html?room=CODE
+    if (room.phase === 'countdown3') {
+      // small delay to allow DB writes to propagate
+      setTimeout(()=> window.location.href = `game.html?room=${encodeURIComponent(roomCode)}`, 250);
+    }
+  });
+
+  membersUnsub = onValue(membersRef, snap => {
+    const mem = snap.exists() ? snap.val() : {};
+    const arr = Object.values(mem || {});
+    if (arr.length === 0) {
+      membersList.textContent = 'No players yet';
+    } else {
+      membersList.innerHTML = arr.map(m => {
+        const name = m.gameName || (m.uid||'').slice(0,6);
+        const status = m.ready ? 'ready' : 'waiting';
+        return `<div>${name} ${m.isBot ? '(bot)' : ''} — ${status}</div>`;
+      }).join('');
+    }
+    // show start button only to owner (owner will be the one who created the room)
+    if (currentUser && mem && mem[currentUser.uid] && mem[currentUser.uid].uid === currentUser.uid) {
+      // owner present in members list
+      // show start button only if owner matches room owner (we check roomRef once)
+      get(roomRef).then(s => {
+        const r = s.exists() ? s.val() : null;
+        if (r && r.owner === currentUser.uid) startBtn.style.display = 'block';
+      });
+    }
+  });
+}
+
+// create room (do not redirect)
+createBtn.addEventListener('click', async () => {
+  const owner = currentUser ? currentUser.uid : null;
+  const ownerGameName = (gameNameInput.value || '').trim() || (owner ? owner.slice(0,6) : 'Player');
+  const roomCode = makeRoomCode(6);
+  const roomRef = ref(db, `rooms/${roomCode}`);
+  try {
+    await set(roomRef, {
+      createdAt: Date.now(),
+      owner,
+      ownerGameName,
+      phase: 'waiting',
+      started: false,
+      maxPlayers: 8
+    });
+    // add owner as member
+    await set(ref(db, `rooms/${roomCode}/members/${owner}`), {
+      uid: owner,
+      gameName: ownerGameName,
+      x: 1800, y: 900,
+      ready: true,
+      caught: false,
+      transformed: false,
+      isBot: false
+    });
+    currentRoom = roomCode;
+    roomInfo.textContent = `Room ${roomCode} created. Waiting for players.`;
+    attachRoomListeners(roomCode);
+  } catch (err) {
+    console.error(err);
+    roomInfo.textContent = 'Create failed';
+  }
+});
+
+// join room (do not redirect)
+joinBtn.addEventListener('click', async () => {
+  const code = (roomInput.value || '').trim().toUpperCase();
+  if (!code) { roomInfo.textContent = 'Enter room code or create a new room'; return; }
+  try {
+    const snap = await get(ref(db, `rooms/${code}`));
+    if (!snap.exists()) { roomInfo.textContent = 'Room not found'; return; }
+    const owner = currentUser ? currentUser.uid : null;
+    const name = (gameNameInput.value || '').trim() || (owner ? owner.slice(0,6) : 'Player');
+    await set(ref(db, `rooms/${code}/members/${owner}`), {
+      uid: owner,
+      gameName: name,
+      x: 1800, y: 900,
+      ready: true,
+      caught: false,
+      transformed: false,
+      isBot: false
+    });
+    currentRoom = code;
+    roomInfo.textContent = `Joined room ${code}. Waiting for owner to start.`;
+    attachRoomListeners(code);
+  } catch (err) {
+    console.error(err);
+    roomInfo.textContent = 'Join failed';
+  }
+});
+
+// owner presses Start -> set phase in DB (everyone listening will redirect)
+startBtn.addEventListener('click', async () => {
+  if (!currentRoom || !currentUser) return;
+  try {
+    const now = Date.now();
+    await update(ref(db, `rooms/${currentRoom}`), {
+      phase: 'countdown3',
+      countdownStart: now
+    });
+    // owner stays on page briefly; listeners will redirect everyone
+  } catch (err) {
+    console.error(err);
+    roomInfo.textContent = 'Start failed';
+  }
+});
+
+// cleanup on unload
+window.addEventListener('beforeunload', () => {
+  if (membersUnsub) membersUnsub();
+  if (roomUnsub) roomUnsub();
+});
+</script>
+</body>
+</html>
