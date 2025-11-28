@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Tag — Game</title>
+<style>
+  :root{--accent:#4cc9f0}
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,#071018,#020305);font-family:Inter,system-ui,Segoe UI,Roboto,Arial;color:#e6eef6;overflow:hidden}
+  #root{display:flex;align-items:center;justify-content:center;height:100%;width:100%;position:relative}
+  canvas#game{width:100%;height:auto;max-width:1280px;border-radius:12px;box-shadow:0 18px 60px rgba(0,0,0,.7);background:#071018;display:block}
+  .hud{position:fixed;left:12px;right:12px;top:12px;height:48px;display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.06));z-index:1200}
+  .muted{color:#9fb6c6;font-size:13px}
+  .status{font-weight:700}
+  .waitingBar{height:12px;background:#0f1720;border-radius:999px;overflow:hidden;width:260px}
+  .waitingFill{height:100%;background:linear-gradient(90deg,var(--accent),#6b9cff);width:0%}
+  .minimap{position:fixed;right:12px;bottom:12px;width:220px;height:132px;border-radius:10px;background:linear-gradient(180deg,#041018,#071018);padding:8px;box-shadow:0 12px 40px rgba(0,0,0,.6);z-index:1150}
+  .minimap canvas{width:100%;height:100%;display:block;border-radius:6px}
+  .action-btn{position:fixed;right:18px;bottom:18px;width:84px;height:84px;border-radius:50%;background:linear-gradient(180deg,var(--accent),#2a9fb8);color:#021018;font-weight:800;font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:1180;border:2px solid rgba(255,255,255,0.06)}
+  .overlayBlack{position:fixed;inset:0;background:#000;display:none;align-items:center;justify-content:center;color:#fff;font-size:28px;z-index:2000;flex-direction:column;gap:12px}
+  .overlayBlack .bigTimer{font-size:72px;font-weight:900}
+  .endScreen{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;z-index:2100}
+  .endCard{background:#fff;color:#021018;padding:20px;border-radius:12px;min-width:320px;text-align:center}
+  /* joystick */
+  .touch-controls{position:fixed;left:12px;bottom:12px;width:220px;height:220px;z-index:1160;pointer-events:auto}
+  .stick-base{position:absolute;left:8px;bottom:8px;width:160px;height:160px;border-radius:50%;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.06));display:flex;align-items:center;justify-content:center;box-shadow:inset 0 8px 30px rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.03);touch-action:none}
+  .stick-knob{width:48px;height:48px;border-radius:50%;background:linear-gradient(180deg,#ffffff12,#00000022);box-shadow:0 10px 30px rgba(0,0,0,0.6);transform:translate(0,0);pointer-events:none}
+  @media (max-width:720px){
+    .minimap{width:160px;height:96px}
+    .stick-base{width:120px;height:120px}
+    .action-btn{right:12px;bottom:12px;width:64px;height:64px;font-size:14px}
+  }
+</style>
+</head>
+<body>
+  <div id="root">
+    <canvas id="game" width="1280" height="720" aria-label="Game canvas"></canvas>
+  </div>
+
+  <div class="hud" role="status" aria-live="polite">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="muted">Room</div>
+      <div id="roomCode" class="status">LOCAL</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="muted">Waiting</div>
+      <div class="waitingBar"><div id="waitingFill" class="waitingFill"></div></div>
+      <div id="readyCount" class="muted">0/0</div>
+      <div id="phaseText" class="muted">idle</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="muted">Freeze</div>
+      <div id="freezeTimer" class="status">00</div>
+      <div class="muted">Game</div>
+      <div id="mainTimer" class="status">10:00</div>
+    </div>
+  </div>
+
+  <div class="minimap" id="minimap"><canvas id="miniCanvas" width="200" height="120"></canvas></div>
+  <button id="actionBtn" class="action-btn" aria-label="Action">Action</button>
+
+  <div id="blackOverlay" class="overlayBlack" aria-hidden="true">
+    <div style="font-size:28px;font-weight:800">Freeze — Catcher ready</div>
+    <div class="bigTimer" id="overlayBigTimer">30</div>
+  </div>
+
+  <div id="endScreen" class="endScreen" role="dialog" aria-hidden="true">
+    <div class="endCard">
+      <h2 id="endTitle">Game Over</h2>
+      <div style="margin-top:12px">Winner: <strong id="winnerName">—</strong></div>
+      <div style="margin-top:16px"><button id="homeBtn" class="action-btn" style="width:auto;height:auto;padding:8px 12px;border-radius:8px">Home</button></div>
+    </div>
+  </div>
+
+  <!-- Joystick -->
+  <div class="touch-controls" id="touchControls">
+    <div class="joystick" id="joystick">
+      <div class="stick-base" id="stickBase">
+        <div class="stick-knob" id="stickKnob"></div>
+      </div>
+    </div>
+  </div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+import { getDatabase, ref, set, update, get, onValue } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+
+/* ---------- Firebase config (keep your config) ---------- */
+const firebaseConfig = {
+  apiKey: "AIzaSyD8Vz9WCsGwvs8a3hm0smPFysM0lMnF2uY",
+  authDomain: "data-c6b63.firebaseapp.com",
+  databaseURL: "https://data-c6b63-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "data-c6b63",
+  storageBucket: "data-c6b63.firebasedestorage.app",
+  messagingSenderId: "473217478100",
+  appId: "1:473217478100:web:e9508960991a17dfa1fa41",
+  measurementId: "G-8P4JRVVCTR"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getDatabase(app);
+
+/* ---------- UI refs ---------- */
+const roomCodeEl = document.getElementById('roomCode');
+const waitingFill = document.getElementById('waitingFill');
+const readyCountEl = document.getElementById('readyCount');
+const phaseText = document.getElementById('phaseText');
+const freezeTimerEl = document.getElementById('freezeTimer');
+const mainTimerEl = document.getElementById('mainTimer');
+const overlay = document.getElementById('blackOverlay');
+const overlayBigTimer = document.getElementById('overlayBigTimer');
+const actionBtn = document.getElementById('actionBtn');
+const endScreen = document.getElementById('endScreen');
+const winnerNameEl = document.getElementById('winnerName');
+const homeBtn = document.getElementById('homeBtn');
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const miniCanvas = document.getElementById('miniCanvas');
+const miniCtx = miniCanvas.getContext('2d');
+
+const stickBase = document.getElementById('stickBase');
+const stickKnob = document.getElementById('stickKnob');
+
+/* ---------- Constants & local state ---------- */
+const INTERNAL_W = 1280, INTERNAL_H = 720;
+const MAP_W = 3600, MAP_H = 2100;
+const PLAYER_RADIUS = 20;
+
+let local = { uid: null, gameName: null };
+let localPlayer = { uid: 'me', x: MAP_W/2, y: MAP_H/2, vx:0, vy:0, speed:220, caught:false, transformed:false };
+let members = {}; // DB snapshot
+let currentRoom = null;
+
+/* phases */
+let phase = 'waiting';
+let countdownStart = 0;
+let freezeUntil = 0;
+let gameEndAt = 0;
+const COUNTDOWN3 = 3, FREEZE_SECONDS = 30, MAIN_SECONDS = 10*60;
+let tickHandle = null;
+
+/* input */
+const keys = {};
+window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+/* joystick state */
+let joy = { x:0, y:0, active:false };
+let touchId = null;
+
+/* ---------- Map objects (ensure visible) ---------- */
+const objects = [];
+function placeObjects(){
+  const palette = ['#8B5A2B','#7FD1B9','#FFB86B','#FFD166','#9E7BFF','#6B7280'];
+  for(let i=0;i<110;i++){
+    objects.push({
+      id: i,
+      type: 'crate',
+      x: Math.random()*(MAP_W-240)+120,
+      y: Math.random()*(MAP_H-240)+120,
+      w: Math.round(36 + Math.random()*120),
+      h: Math.round(24 + Math.random()*80),
+      color: palette[Math.floor(Math.random()*palette.length)],
+      angle: (Math.random()-0.5)*0.4
+    });
+  }
+}
+placeObjects();
+
+/* ---------- Helpers ---------- */
+function getRoomFromQuery(){
+  const p = new URLSearchParams(window.location.search);
+  return (p.get('room') || '').toUpperCase() || null;
+}
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+function fmtTime(s){ if (s<0) s=0; const m=Math.floor(s/60).toString().padStart(2,'0'); const sec=Math.floor(s%60).toString().padStart(2,'0'); return `${m}:${sec}`; }
+
+/* ---------- Auth & join flow ---------- */
+onAuthStateChanged(auth, async user => {
+  if (!user) {
+    // try anonymous sign-in to ensure every client has a uid
+    try { await signInAnonymously(auth); return; } catch(e){ window.location.href = 'index.html'; return; }
+  }
+  local.uid = user.uid;
+  local.gameName = user.email ? user.email.split('@')[0] : user.uid.slice(0,6);
+
+  // auto-join if room param present
+  const code = getRoomFromQuery();
+  if (!code) {
+    // no room param -> go back to lobby
+    window.location.href = 'custom.html';
+    return;
+  }
+  currentRoom = code;
+  roomCodeEl.textContent = currentRoom;
+
+  // write our member entry (ensures other clients see us)
+  await set(ref(db, `rooms/${currentRoom}/members/${local.uid}`), {
+    uid: local.uid,
+    gameName: local.gameName,
+    x: localPlayer.x, y: localPlayer.y,
+    ready: true,
+    caught: false,
+    transformed: false,
+    isBot: false
+  });
+
+  // attach listeners and start
+  await joinRoomAndListen(currentRoom);
+  startMembersListener();
+});
+
+/* ---------- DB listeners & phase handling ---------- */
+let membersUnsub = null, roomUnsub = null;
+
+async function joinRoomAndListen(roomCode){
+  if (!roomCode) return;
+  currentRoom = roomCode;
+  roomCodeEl.textContent = roomCode;
+
+  const membersRef = ref(db, `rooms/${roomCode}/members`);
+  const roomRef = ref(db, `rooms/${roomCode}`);
+
+  if (membersUnsub) membersUnsub();
+  membersUnsub = onValue(membersRef, snap => {
+    members = snap.exists() ? snap.val() : {};
+    window._members = members;
+    updateWaitingUIFromMembers(members);
+    // update local player from DB if present
+    if (local.uid && members[local.uid]) {
+      const m = members[local.uid];
+      localPlayer.x = m.x ?? localPlayer.x;
+      localPlayer.y = m.y ?? localPlayer.y;
+      localPlayer.caught = !!m.caught;
+      localPlayer.transformed = !!m.transformed;
+    }
+  });
+
+  if (roomUnsub) roomUnsub();
+  roomUnsub = onValue(roomRef, snap => {
+    const room = snap.exists() ? snap.val() : {};
+    const newPhase = room.phase || 'waiting';
+    if (newPhase !== phase) handlePhaseChange(newPhase, room);
+    // keep catcher info for minimap
+    members.room = members.room || {};
+    members.room.catcher = room.catcher || members.room.catcher;
+  });
+}
+
+function handlePhaseChange(newPhase, roomData = {}){
+  phase = newPhase;
+  if (phase === 'countdown3') {
+    countdownStart = roomData.countdownStart || Date.now();
+    waitingFill.parentElement.style.display = 'none';
+    startTick();
+  } else if (phase === 'freeze30') {
+    freezeUntil = roomData.freezeUntil || Date.now() + FREEZE_SECONDS*1000;
+    startTick();
+  } else if (phase === 'running') {
+    gameEndAt = roomData.gameEndAt || Date.now() + MAIN_SECONDS*1000;
+    overlay.style.display = 'none';
+    startTick();
+  } else if (phase === 'waiting') {
+    waitingFill.parentElement.style.display = '';
+    phaseText.textContent = 'idle';
+  }
+}
+
+/* ---------- Tick & phase progression ---------- */
+function startTick(){
+  if (tickHandle) clearInterval(tickHandle);
+  tickHandle = setInterval(async () => {
+    if (!currentRoom) return;
+    const roomSnap = await get(ref(db, `rooms/${currentRoom}`));
+    const data = roomSnap.exists() ? roomSnap.val() : {};
+    const dbPhase = data.phase || 'waiting';
+
+    if (dbPhase === 'countdown3') {
+      const startAt = data.countdownStart || Date.now();
+      const elapsed = Math.floor((Date.now() - startAt)/1000);
+      const remain = Math.max(0, COUNTDOWN3 - elapsed);
+      phaseText.textContent = `Starting in ${remain}s`;
+      if (remain <= 0) {
+        // set freeze30 if not already set
+        if (data.phase === 'countdown3') {
+          const memSnap = await get(ref(db, `rooms/${currentRoom}/members`));
+          const mem = memSnap.exists() ? memSnap.val() : {};
+          const uids = Object.keys(mem || {});
+          const pick = uids.length ? uids[Math.floor(Math.random()*uids.length)] : null;
+          await update(ref(db, `rooms/${currentRoom}`), {
+            phase: 'freeze30',
+            freezeUntil: Date.now() + FREEZE_SECONDS*1000,
+            catcher: pick || data.catcher || null
+          });
+        }
+      }
+    } else if (dbPhase === 'freeze30') {
+      const remain = Math.max(0, Math.ceil(((data.freezeUntil || Date.now()) - Date.now())/1000));
+      freezeTimerEl.textContent = String(remain);
+      overlayBigTimer.textContent = String(remain);
+      if (data.catcher === local.uid) overlay.style.display = 'flex';
+      else overlay.style.display = 'none';
+      if (remain <= 0) {
+        await update(ref(db, `rooms/${currentRoom}`), { phase: 'running', gameEndAt: Date.now() + MAIN_SECONDS*1000 });
+      }
+    } else if (dbPhase === 'running') {
+      const remain = Math.max(0, Math.ceil(((data.gameEndAt || Date.now()) - Date.now())/1000));
+      mainTimerEl.textContent = fmtTime(remain);
+      if (remain <= 0 && !data.finished) {
+        const memSnap = await get(ref(db, `rooms/${currentRoom}/members`));
+        const mem = memSnap.exists() ? memSnap.val() : {};
+        const uncaught = Object.keys(mem || {}).filter(k => mem[k] && !mem[k].caught);
+        const winner = uncaught.length ? uncaught[Math.floor(Math.random()*uncaught.length)] : data.catcher;
+        await update(ref(db, `rooms/${currentRoom}`), { finished: true, winnerUid: winner, finishedAt: Date.now() });
+      }
+    } else if (dbPhase === 'finished') {
+      const winnerUid = data.winnerUid;
+      const memSnap = await get(ref(db, `rooms/${currentRoom}/members/${winnerUid}`));
+      const winnerName = memSnap.exists() ? (memSnap.val().gameName || winnerUid) : '—';
+      winnerNameEl.textContent = winnerName;
+      endScreen.style.display = 'flex';
+      clearInterval(tickHandle);
+    }
+  }, 400);
+}
+
+/* ---------- Members listener (keeps members var updated) ---------- */
+let membersListener = null;
+function startMembersListener(){
+  if (!currentRoom) return;
+  const membersRef = ref(db, `rooms/${currentRoom}/members`);
+  if (membersListener) membersListener();
+  membersListener = onValue(membersRef, snap => {
+    members = snap.exists() ? snap.val() : {};
+  });
+}
+
+/* ---------- HUD update ---------- */
+function updateWaitingUIFromMembers(membersObj){
+  const arr = Object.values(membersObj || {}).filter(m => m && m.uid);
+  const total = arr.length || 0;
+  const ready = arr.filter(m => m.ready).length || 0;
+  readyCountEl.textContent = `${ready}/${total}`;
+  waitingFill.style.width = total ? `${Math.round((ready/total)*100)}%` : '0%';
+}
+
+/* ---------- Movement & input integration ---------- */
+function integrateInput(dt){
+  // joystick takes precedence
+  let mx = 0, my = 0;
+  if (joy.active && (Math.abs(joy.x) > 0.02 || Math.abs(joy.y) > 0.02)) {
+    mx = joy.x; my = joy.y;
+  } else {
+    if (keys['w']||keys['arrowup']) my -= 1;
+    if (keys['s']||keys['arrowdown']) my += 1;
+    if (keys['a']||keys['arrowleft']) mx -= 1;
+    if (keys['d']||keys['arrowright']) mx += 1;
+  }
+  const len = Math.hypot(mx,my);
+  const speedMult = (localPlayer.speedUntil && Date.now() < localPlayer.speedUntil) ? 1.35 : 1;
+  if (len > 0.01 && !localPlayer.caught) {
+    localPlayer.vx = (mx/len) * localPlayer.speed * speedMult;
+    localPlayer.vy = (my/len) * localPlayer.speed * speedMult;
+  } else {
+    localPlayer.vx = 0; localPlayer.vy = 0;
+  }
+  localPlayer.x += localPlayer.vx * dt;
+  localPlayer.y += localPlayer.vy * dt;
+  localPlayer.x = clamp(localPlayer.x, PLAYER_RADIUS, MAP_W-PLAYER_RADIUS);
+  localPlayer.y = clamp(localPlayer.y, PLAYER_RADIUS, MAP_H-PLAYER_RADIUS);
+}
+
+/* write local position to DB (throttled) */
+let lastWrite = 0;
+async function writeLocalPlayer(){
+  if (!currentRoom || !local.uid) return;
+  const now = Date.now();
+  if (now - lastWrite < 200) return;
+  lastWrite = now;
+  try {
+    await update(ref(db, `rooms/${currentRoom}/members/${local.uid}`), {
+      x: localPlayer.x,
+      y: localPlayer.y,
+      caught: !!localPlayer.caught,
+      transformed: !!localPlayer.transformed
+    });
+  } catch(e){ console.error('writeLocalPlayer', e); }
+}
+
+/* ---------- Rendering ---------- */
+function drawObject(o){
+  const sx = o.x - (localPlayer.x - INTERNAL_W/2);
+  const sy = o.y - (localPlayer.y - INTERNAL_H/2);
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.rotate(o.angle);
+  const grad = ctx.createLinearGradient(-o.w/2, -o.h/2, o.w/2, o.h/2);
+  grad.addColorStop(0, o.color);
+  grad.addColorStop(1, '#00000022');
+  ctx.fillStyle = grad;
+  ctx.fillRect(-o.w/2, -o.h/2, o.w, o.h);
+  ctx.restore();
+}
+
+function drawPlayer(p){
+  const sx = Math.round((p.x || MAP_W/2) - (localPlayer.x - INTERNAL_W/2));
+  const sy = Math.round((p.y || MAP_H/2) - (localPlayer.y - INTERNAL_H/2));
+  ctx.save();
+  ctx.beginPath();
+  ctx.fillStyle = p.caught ? '#666' : (p.uid === (members.room && members.room.catcher) ? '#ffd166' : '#4cc9f0');
+  ctx.arc(sx, sy, PLAYER_RADIUS, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = '12px system-ui,Arial'; ctx.textAlign = 'center';
+  ctx.fillText(p.gameName || p.uid.slice(0,6), sx, sy - PLAYER_RADIUS - 8);
+  if (p.transformed) {
+    ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.beginPath(); ctx.arc(sx, sy, PLAYER_RADIUS+8, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawMiniMap(){
+  const w = miniCanvas.width, h = miniCanvas.height;
+  miniCtx.clearRect(0,0,w,h);
+  miniCtx.fillStyle = '#041018'; miniCtx.fillRect(0,0,w,h);
+  const sx = w / MAP_W, sy = h / MAP_H;
+  // draw objects as small dots
+  for (const o of objects.slice(0,80)){
+    miniCtx.fillStyle = '#2b3b3f';
+    miniCtx.fillRect(o.x * sx - 1, o.y * sy - 1, 2, 2);
+  }
+  const mainRemain = gameEndAt ? Math.max(0, Math.ceil((gameEndAt - Date.now())/1000)) : MAIN_SECONDS;
+  const seekerIsLocal = members.room && members.room.catcher === local.uid;
+  const showPlayers = !seekerIsLocal || mainRemain <= 60;
+  for (const [uid, m] of Object.entries(members || {})){
+    if (uid === 'room') continue;
+    if (!showPlayers && uid !== local.uid) continue;
+    miniCtx.beginPath();
+    miniCtx.fillStyle = m.caught ? '#666' : (m.uid === (members.room && members.room.catcher) ? '#ffd166' : '#4cc9f0');
+    miniCtx.arc((m.x||0) * sx, (m.y||0) * sy, 3, 0, Math.PI*2); miniCtx.fill();
+  }
+  // viewport rect
+  miniCtx.strokeStyle = 'rgba(255,255,255,0.06)';
+  miniCtx.strokeRect((localPlayer.x - INTERNAL_W/2) * sx, (localPlayer.y - INTERNAL_H/2) * sy, INTERNAL_W * sx, INTERNAL_H * sy);
+}
+
+function render(){
+  // background
+  ctx.fillStyle = '#071018'; ctx.fillRect(0,0,INTERNAL_W,INTERNAL_H);
+  // grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.02)'; ctx.lineWidth = 1;
+  const tile = 128;
+  const camX = localPlayer.x - INTERNAL_W/2;
+  const camY = localPlayer.y - INTERNAL_H/2;
+  for (let x = - (camX % tile); x < INTERNAL_W; x += tile){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,INTERNAL_H); ctx.stroke(); }
+  for (let y = - (camY % tile); y < INTERNAL_H; y += tile){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(INTERNAL_W,y); ctx.stroke(); }
+
+  // draw objects
+  const drawList = objects.slice().sort((a,b)=>a.y-b.y);
+  for (const o of drawList) drawObject(o);
+
+  // draw players
+  const list = Object.entries(members || {}).filter(([k]) => k !== 'room').map(([uid,v]) => ({ uid, ...v })).sort((a,b)=> (a.y||0)-(b.y||0));
+  for (const p of list) drawPlayer(p);
+
+  drawMiniMap();
+}
+
+/* ---------- Main loop ---------- */
+let last = performance.now();
+function loop(now){
+  const dt = Math.min(0.05, (now - last)/1000);
+  last = now;
+
+  // update movement
+  integrateInput(dt);
+  // write position to DB
+  writeLocalPlayer();
+
+  render();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ---------- Joystick handlers ---------- */
+function getLocalPos(el, clientX, clientY){
+  const r = el.getBoundingClientRect();
+  return { x: clientX - r.left, y: clientY - r.top, w: r.width, h: r.height };
+}
+function updateJoy(touch){
+  const p = getLocalPos(stickBase, touch.clientX, touch.clientY);
+  const cx = p.w/2, cy = p.h/2;
+  const dx = p.x - cx, dy = p.y - cy;
+  const max = Math.min(p.w,p.h)/2 - 10;
+  const d = Math.hypot(dx,dy);
+  const nx = d ? dx/d : 0, ny = d ? dy/d : 0;
+  const mag = Math.min(d, max) / max;
+  joy.x = nx * mag; joy.y = ny * mag;
+  stickKnob.style.transform = `translate(${joy.x * max}px, ${joy.y * max}px)`;
+}
+function startJoy(e){
+  if (e.cancelable) e.preventDefault();
+  const t = e.changedTouches ? e.changedTouches[0] : e;
+  touchId = t.identifier ?? 'mouse';
+  joy.active = true;
+  updateJoy(t);
+  window.addEventListener('touchmove', onWindowTouchMove, { passive:false });
+  window.addEventListener('mousemove', onMouseMove, { passive:false });
+}
+function endJoy(e){
+  if (e && e.cancelable) e.preventDefault();
+  joy.active = false; touchId = null; joy.x = 0; joy.y = 0;
+  stickKnob.style.transform = `translate(0px, 0px)`;
+  window.removeEventListener('touchmove', onWindowTouchMove, { passive:false });
+  window.removeEventListener('mousemove', onMouseMove, { passive:false });
+}
+function onWindowTouchMove(e){
+  if (!joy.active) return;
+  for (const t of e.changedTouches) {
+    if (touchId === 'mouse' || t.identifier === touchId) {
+      if (e.cancelable) e.preventDefault();
+      updateJoy(t);
+      break;
+    }
+  }
+}
+function onMouseMove(e){ if (!joy.active) return; if (e.cancelable) e.preventDefault(); updateJoy(e); }
+
+stickBase.addEventListener('touchstart', startJoy, { passive:false });
+stickBase.addEventListener('touchmove', (e)=>{ for (const t of e.changedTouches) if (touchId===null||t.identifier===touchId){ updateJoy(t); break } }, { passive:false });
+stickBase.addEventListener('touchend', endJoy, { passive:false });
+stickBase.addEventListener('touchcancel', endJoy, { passive:false });
+stickBase.addEventListener('mousedown', startJoy);
+window.addEventListener('mouseup', (e)=>{ if (joy.active) endJoy(e); });
+
+/* ---------- Action button (transform/hide) ---------- */
+actionBtn.addEventListener('click', async () => {
+  if (!currentRoom || !local.uid) return;
+  localPlayer.transformed = !localPlayer.transformed;
+  await update(ref(db, `rooms/${currentRoom}/members/${local.uid}`), {
+    transformed: !!localPlayer.transformed,
+    transformTarget: localPlayer.transformed ? { id: 'manual', type: 'manual' } : null
+  });
+});
+
+/* ---------- Home button ---------- */
+homeBtn.addEventListener('click', ()=> window.location.href = 'custom.html');
+
+/* ---------- Expose debug helpers ---------- */
+window._members = members;
+window._local = local;
+window.currentRoom = currentRoom;
+
+</script>
+</body>
+</html>
